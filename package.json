@@ -1,0 +1,42 @@
+{
+  "name": "@zollibee/claude-statusline",
+  "version": "0.1.0",
+  "description": "A compact Claude Code statusline script with npm and curl installers.",
+  "license": "MIT",
+  "author": "zollibee",
+  "homepage": "https://github.com/sohee-zoe/claude-statusline#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sohee-zoe/claude-statusline.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sohee-zoe/claude-statusline/issues"
+  },
+  "bin": {
+    "claude-statusline": "bin/claude-statusline.js"
+  },
+  "files": [
+    "bin/",
+    "install.sh",
+    "statusline.sh",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "test": "node --test",
+    "lint:shell": "shellcheck statusline.sh install.sh",
+    "check": "npm test && bash -n statusline.sh && bash -n install.sh && shellcheck statusline.sh install.sh"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "statusline",
+    "cli"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

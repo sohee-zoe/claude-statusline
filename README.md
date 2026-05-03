@@ -34,6 +34,7 @@ curl -fsSL https://raw.githubusercontent.com/sohee-zoe/claude-statusline/main/in
 
 The installer downloads `statusline.sh` to `~/.claude/statusline.sh`, marks it
 executable, and asks whether to update `~/.claude/settings.json`.
+If `statusline.sh` already exists, it is backed up before being replaced.
 
 If you answer `y`, the installer backs up `settings.json` first, then writes:
 

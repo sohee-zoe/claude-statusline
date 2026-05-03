@@ -7,6 +7,11 @@ script_path="$claude_dir/statusline.sh"
 settings_path="$claude_dir/settings.json"
 
 mkdir -p "$claude_dir"
+if [ -f "$script_path" ]; then
+  script_backup_path="$script_path.backup.$(date '+%Y%m%d%H%M%S')"
+  cp "$script_path" "$script_backup_path"
+  printf 'Backed up %s to %s\n' "$script_path" "$script_backup_path"
+fi
 curl -fsSL "$repo_url/statusline.sh" -o "$script_path"
 chmod +x "$script_path"
 

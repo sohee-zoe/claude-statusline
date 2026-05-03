@@ -24,25 +24,18 @@ token usage, cost, git branch, and agent metadata.
 - Common Unix tools: `awk`, `perl`, `date`
 - Optional: `git`, for branch display
 
-## Install with npm, Yarn, pnpm, or Bun
+## Install
 
-Install the package globally, then run the installer:
-
-```bash
-npm install -g @zollibee/claude-statusline
-claude-statusline install
-```
-
-Equivalent package-manager commands:
+Install with curl:
 
 ```bash
-yarn global add @zollibee/claude-statusline
-pnpm add -g @zollibee/claude-statusline
-bun add -g @zollibee/claude-statusline
+curl -fsSL https://raw.githubusercontent.com/sohee-zoe/claude-statusline/main/install.sh | bash
 ```
 
-The installer copies `statusline.sh` to `~/.claude/statusline.sh`, marks it
-executable, and updates `~/.claude/settings.json` with:
+The installer downloads `statusline.sh` to `~/.claude/statusline.sh`, marks it
+executable, and prints the Claude Code settings snippet.
+
+Add this to `~/.claude/settings.json`:
 
 ```json
 {
@@ -54,20 +47,8 @@ executable, and updates `~/.claude/settings.json` with:
 }
 ```
 
-To print the settings snippet without installing:
-
-```bash
-claude-statusline print-settings
-```
-
-## Install with curl
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/sohee-zoe/claude-statusline/main/install.sh | bash
-```
-
-The curl installer copies the script and prints the settings snippet. It does
-not edit `settings.json` automatically.
+Claude Code reloads settings automatically, but the statusline usually updates
+after the next interaction.
 
 ## Manual Installation
 
@@ -81,13 +62,13 @@ Then add the `statusLine` block shown above to `~/.claude/settings.json`.
 
 ## Development
 
-Run tests and checks:
+Run checks:
 
 ```bash
-npm test
 bash -n statusline.sh
 bash -n install.sh
 shellcheck statusline.sh install.sh
+xmllint --noout assets/statusline-preview.svg
 ```
 
 Run a local smoke test:
@@ -95,22 +76,6 @@ Run a local smoke test:
 ```bash
 printf '%s\n' '{"model":{"id":"claude-sonnet-4-5"},"workspace":{"current_dir":"/tmp/example"},"context_window":{"remaining_percentage":72}}' | ./statusline.sh
 ```
-
-Preview npm package contents:
-
-```bash
-npm pack --dry-run
-```
-
-## Publishing
-
-```bash
-npm login
-npm publish --access public
-```
-
-After publishing, the same package can be installed with npm, Yarn, pnpm, and
-Bun because they all consume npm registry packages.
 
 ## Credits
 

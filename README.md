@@ -6,6 +6,7 @@ token usage, cost, git branch, and agent metadata.
 ## Preview
 
 ![Claude Statusline preview](assets/statusline-preview.svg)
+![Claude Statusline preview](assets/statusline-preview.png)
 
 ## Features
 

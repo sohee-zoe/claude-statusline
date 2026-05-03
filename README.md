@@ -33,19 +33,23 @@ curl -fsSL https://raw.githubusercontent.com/sohee-zoe/claude-statusline/main/in
 ```
 
 The installer downloads `statusline.sh` to `~/.claude/statusline.sh`, marks it
-executable, and prints the Claude Code settings snippet.
+executable, and asks whether to update `~/.claude/settings.json`.
 
-Add this to `~/.claude/settings.json`:
+If you answer `y`, the installer backs up `settings.json` first, then writes:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "~/.claude/statusline.sh",
+    "command": "/Users/you/.claude/statusline.sh",
     "padding": 0
   }
 }
 ```
+
+The actual `command` value is generated from your `CLAUDE_CONFIG_DIR` or
+`~/.claude` path. If you skip the prompt, the installer prints the same block
+for manual setup.
 
 Claude Code reloads settings automatically, but the statusline usually updates
 after the next interaction.

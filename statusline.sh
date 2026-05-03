@@ -264,8 +264,7 @@ tokens_segment() {
   input="$(number_or_zero "$ctx_input_tokens")"
   output="$(number_or_zero "$ctx_output_tokens")"
   cache_create="$(number_or_zero "$ctx_cache_creation_tokens")"
-  cache_read="$(number_or_zero "$ctx_cache_read_tokens")"
-  current=$((input + output + cache_create + cache_read))
+  current=$((input + output + cache_create))
 
   if [ "$total" -eq 0 ] && [ "$current" -eq 0 ]; then
     return

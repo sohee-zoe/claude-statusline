@@ -3,6 +3,10 @@
 A compact Claude Code statusline for model, workspace, context, rate limits,
 token usage, cost, git branch, and agent metadata.
 
+## Preview
+
+![Claude Statusline preview](assets/statusline-preview.svg)
+
 ## Features
 
 - Multi-line Claude Code statusline powered by `statusline.sh`

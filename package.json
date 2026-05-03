@@ -16,6 +16,7 @@
     "claude-statusline": "bin/claude-statusline.js"
   },
   "files": [
+    "assets/",
     "bin/",
     "install.sh",
     "statusline.sh",

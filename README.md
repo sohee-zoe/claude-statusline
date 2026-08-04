@@ -143,13 +143,24 @@ Then add the `statusLine` block shown above to `~/.claude/settings.json`.
 
 ## Development
 
-Run checks:
+Run the regression suite:
 
 ```bash
-bash -n variants/compact.sh
-bash -n variants/full.sh
-bash -n install.sh
-shellcheck variants/*.sh install.sh
+./test.sh              # width sweep, edge cases, installer paths
+./test.sh width        # one section only
+TEST_WIDTH_STEP=1 ./test.sh width   # every column instead of every fifth
+```
+
+The sweep renders each fixture at every width from 40 to 220 in all three
+line modes and checks that no line exceeds its budget, that `auto` never gets
+taller as the terminal widens, and that the most compact layout stays within
+a pinned ceiling. The installer section runs every path against a `file://`
+repo, so it needs no network.
+
+Other checks:
+
+```bash
+shellcheck variants/*.sh install.sh test.sh
 xmllint --noout assets/statusline-preview.svg
 ```
 

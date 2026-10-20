@@ -1,36 +1,19 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1220" height="230" viewBox="0 0 1220 230" role="img" aria-labelledby="title desc">
+<svg xmlns="http://www.w3.org/2000/svg" width="1700" height="410" viewBox="0 0 1700 410" role="img" aria-labelledby="title desc">
   <title id="title">Claude Statusline preview</title>
-  <desc id="desc">A terminal-style preview of the Claude Statusline output with colored model, context, rate limit, and line-change segments.</desc>
-  <rect width="1220" height="230" rx="14" fill="#101216"/>
-  <rect x="1" y="1" width="1218" height="228" rx="14" fill="none" stroke="#2f3542"/>
+  <desc id="desc">Terminal-style preview of the compact (adaptive) and full statusline variants.</desc>
+  <rect width="1700" height="410" rx="14" fill="#101216"/>
+  <rect x="1" y="1" width="1698" height="408" rx="14" fill="none" stroke="#2f3542"/>
   <circle cx="30" cy="28" r="6" fill="#ff5f57"/>
   <circle cx="52" cy="28" r="6" fill="#ffbd2e"/>
   <circle cx="74" cy="28" r="6" fill="#28c840"/>
-  <text x="28" y="70" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#e7eaf0">
-    <tspan font-weight="700" fill="#ff8700">[sonnet-4-5]</tspan>
-    <tspan>   📁 claude-statusline</tspan>
-  </text>
-  <text x="28" y="112" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#e7eaf0">
-    <tspan font-weight="700">💬 context</tspan>
-    <tspan>  </tspan>
-    <tspan fill="#50fa7b">  72% [▓▓▓▓▓▓▓░░░]</tspan>
-    <tspan>  138k / 200k    |   🧾 lines   </tspan>
-    <tspan fill="#50fa7b">+ 148</tspan>
-    <tspan>     </tspan>
-    <tspan fill="#ff5555">- 22</tspan>
-    <tspan>      |   💎 tokens   Σ 217k (+65k)</tspan>
-  </text>
-  <text x="28" y="154" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#e7eaf0">
-    <tspan font-weight="700">⏳ 5h      </tspan>
-    <tspan> </tspan>
-    <tspan fill="#50fa7b">  75% [▓▓▓▓▓▓▓░░░]</tspan>
-    <tspan> (10-09 17:53)   |   </tspan>
-    <tspan font-weight="700">⏳ 7d      </tspan>
-    <tspan> </tspan>
-    <tspan fill="#50fa7b">  60% [▓▓▓▓▓▓░░░░]</tspan>
-    <tspan> (10-15 12:46)</tspan>
-  </text>
-  <text x="28" y="196" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="20" fill="#e7eaf0">
-    <tspan>⚙️ effort    medium   |   💭 thinking    on   |   🤖 agent codex</tspan>
-  </text>
+  <text x="28" y="64" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6b7280"># compact — wide terminal (1 line)</text>
+  <text x="28" y="94" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#ff8700" font-weight="700">[sonnet-4-5]</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">📁 claude-statusline</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">💬 </tspan><tspan fill="#50fa7b"> 72%</tspan><tspan fill="#e7eaf0"> </tspan><tspan fill="#50fa7b">[▓▓▓▓░░]</tspan><tspan fill="#e7eaf0"> 142k</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">⏳ 5h </tspan><tspan fill="#50fa7b"> 75%</tspan><tspan fill="#e7eaf0"> </tspan><tspan fill="#50fa7b">[▓▓▓▓░░]</tspan><tspan fill="#e7eaf0"> (10-03 13:00)</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">⏳ 7d </tspan><tspan fill="#50fa7b"> 60%</tspan><tspan fill="#e7eaf0"> </tspan><tspan fill="#50fa7b">[▓▓▓░░░]</tspan><tspan fill="#e7eaf0"> (10-09 07:53)</tspan></text>
+  <text x="28" y="144" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6b7280"># compact — narrow terminal (2 lines)</text>
+  <text x="28" y="174" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#ff8700" font-weight="700">[sonnet-4-5]</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">📁 claude-statusline</tspan></text>
+  <text x="28" y="202" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#e7eaf0">💬 </tspan><tspan fill="#50fa7b"> 72%</tspan><tspan fill="#e7eaf0"> 142k</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">⏳ 5h </tspan><tspan fill="#50fa7b"> 75%</tspan><tspan fill="#e7eaf0"> (10-03 13:00)</tspan><tspan fill="#6b7280"> | </tspan><tspan fill="#e7eaf0">⏳ 7d </tspan><tspan fill="#50fa7b"> 60%</tspan><tspan fill="#e7eaf0"> (10-09 07:53)</tspan></text>
+  <text x="28" y="252" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="14" fill="#6b7280"># full</text>
+  <text x="28" y="282" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#ff8700" font-weight="700">[sonnet-4-5]</tspan><tspan fill="#e7eaf0">   📁 claude-statusline</tspan></text>
+  <text x="28" y="310" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#e7eaf0" font-weight="700">💬 context</tspan><tspan fill="#e7eaf0">  </tspan><tspan fill="#50fa7b">  72% [▓▓▓▓▓▓▓░░░]</tspan><tspan fill="#e7eaf0">  142k / 200k    |   🧾 lines   </tspan><tspan fill="#50fa7b">+ 148</tspan><tspan fill="#e7eaf0">     </tspan><tspan fill="#ff5555">- 22</tspan><tspan fill="#e7eaf0">      |   💎 tokens   Σ 217k (+67k)</tspan></text>
+  <text x="28" y="338" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#e7eaf0" font-weight="700">⏳ 5h      </tspan><tspan fill="#e7eaf0"> </tspan><tspan fill="#50fa7b">  75% [▓▓▓▓▓▓▓░░░]</tspan><tspan fill="#e7eaf0"> (10-03 13:00)   |   </tspan><tspan fill="#e7eaf0" font-weight="700">⏳ 7d      </tspan><tspan fill="#e7eaf0"> </tspan><tspan fill="#50fa7b">  60% [▓▓▓▓▓▓░░░░]</tspan><tspan fill="#e7eaf0"> (10-09 07:53)</tspan></text>
+  <text x="28" y="366" xml:space="preserve" font-family="SFMono-Regular, Menlo, Consolas, monospace" font-size="18" fill="#e7eaf0"><tspan fill="#e7eaf0">⚙️ effort    medium   |   💭 thinking    on   |   🤖 agent codex</tspan></text>
 </svg>

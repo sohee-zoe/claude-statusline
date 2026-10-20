@@ -2,7 +2,7 @@
 set -u
 shopt -s extglob
 
-input="$(cat)"
+IFS= read -r -d '' input
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '[statusline] jq not found\n'
@@ -22,6 +22,7 @@ RATE_RESET_PLACEHOLDER='mm-dd hh:mm'
 DETAIL_FIRST_SEGMENT_WIDTH=66
 SEVEN_DAY_LABEL_WIDTH=12
 
+_r=''
 model_id=''
 current_dir=''
 ctx_remaining=''
@@ -45,7 +46,7 @@ thinking_state=''
 agent_name=''
 account_has_limits=''
 
-parsed_vars="$(printf '%s' "$input" | jq -r '
+parsed_vars="$(jq -r '
   def s($v): ($v // "" | tostring | @sh);
   [
     "model_id=" + s(.model.id // .model.display_name // "unknown-model"),
@@ -71,7 +72,7 @@ parsed_vars="$(printf '%s' "$input" | jq -r '
     "agent_name=" + s(.agent.name),
     "account_has_limits=" + s(if (.rate_limits | type) == "object" and ((.rate_limits.five_hour.used_percentage? != null) or (.rate_limits.seven_day.used_percentage? != null)) then "yes" else "no" end)
   ] | .[]
-' 2>/dev/null)" || {
+' <<<"$input" 2>/dev/null)" || {
   printf '[statusline] invalid input\n'
   exit 0
 }
@@ -81,173 +82,129 @@ display_dir="${current_dir%/}"
 display_dir="${display_dir##*/}"
 [ -z "$display_dir" ] && display_dir="$current_dir"
 
-number_or_zero() {
-  if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
-    printf '%s' "$((10#$1))"
-    return
-  fi
-  awk -v value="${1:-}" 'BEGIN {
-    if (value == "" || value !~ /^-?[0-9]+([.][0-9]+)?$/) value = 0
-    printf "%d", value
-  }'
+number_or_zero() { # <value> -> _r (truncated integer, 0 if not numeric)
+  _r=0
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] || return 0
+  _r=$((10#${BASH_REMATCH[2]}))
+  [ -n "${BASH_REMATCH[1]}" ] && _r=$((-_r))
+  return 0
 }
 
-number_or_empty() {
-  awk -v value="${1:-}" 'BEGIN {
-    if (value ~ /^-?[0-9]+([.][0-9]+)?$/) printf "%s", value
-  }'
+number_or_empty() { # <value> -> _r (value if numeric, else empty)
+  _r=''
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] && _r="$1"
+  return 0
 }
 
-integer_or_empty() {
-  awk -v value="${1:-}" 'BEGIN {
-    if (value ~ /^-?[0-9]+([.][0-9]+)?$/) printf "%d", value
-  }'
+integer_or_empty() { # <value> -> _r (truncated integer if numeric, else empty)
+  _r=''
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] && number_or_zero "$1"
+  return 0
 }
 
 number_is_nonzero() {
-  awk -v value="${1:-}" 'BEGIN {
-    exit !(value ~ /^-?[0-9]+([.][0-9]+)?$/ && value + 0 != 0)
-  }'
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] && [[ ! "$1" =~ ^-?0+(\.0+)?$ ]]
 }
 
-clamp_round_percent() {
-  if [[ "$1" =~ ^[0-9]+$ ]]; then
-    local n=$((10#$1))
-    printf '%s' "$((n > 100 ? 100 : n))"
-    return
-  fi
-  awk -v value="$1" 'BEGIN {
-    if (value == "" || value !~ /^-?[0-9]+([.][0-9]+)?$/) value = 0
-    if (value < 0) value = 0
-    if (value > 100) value = 100
-    printf "%d", value + 0.5
-  }'
+clamp_round_percent() { # <value> -> _r (0..100, rounded half up)
+  _r=0
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] || return 0
+  [ -n "${BASH_REMATCH[1]}" ] && return 0
+  _r=$((10#${BASH_REMATCH[2]}))
+  [ "${BASH_REMATCH[4]:0:1}" -ge 5 ] 2>/dev/null && _r=$((_r + 1))
+  [ "$_r" -gt 100 ] && _r=100
+  return 0
 }
 
-remaining_from_used() {
-  if [[ "$1" =~ ^[0-9]+$ ]]; then
-    local n=$((10#$1))
-    printf '%s' "$((n > 100 ? 0 : 100 - n))"
-    return
-  fi
-  awk -v used="$1" 'BEGIN {
-    if (used == "" || used !~ /^-?[0-9]+([.][0-9]+)?$/) used = 0
-    remaining = 100 - used
-    if (remaining < 0) remaining = 0
-    if (remaining > 100) remaining = 100
-    printf "%d", remaining + 0.5
-  }'
-}
-
-color_for_remaining() {
-  local remaining="$1"
-
-  if [ "$remaining" -ge 50 ]; then
-    printf '%s' "$GREEN"
-  elif [ "$remaining" -ge 20 ]; then
-    printf '%s' "$ORANGE"
+remaining_from_used() { # <used percent> -> _r (100 - used, 0..100, rounded half up)
+  local int frac rest
+  _r=100
+  [[ "${1:-}" =~ ^(-?)([0-9]+)(\.([0-9]+))?$ ]] || return 0
+  [ -n "${BASH_REMATCH[1]}" ] && return 0
+  int=$((10#${BASH_REMATCH[2]}))
+  frac="${BASH_REMATCH[4]:-0}"
+  if [ "$int" -ge 100 ]; then _r=0; return 0; fi
+  rest="${frac:1}"
+  if [[ "$frac" =~ ^0+$ ]]; then
+    _r=$((100 - int))
+  elif [ "${frac:0:1}" -lt 5 ] || { [ "${frac:0:1}" -eq 5 ] && [[ "${rest:-0}" =~ ^0+$ ]]; }; then
+    _r=$((100 - int))
   else
-    printf '%s' "$RED"
+    _r=$((99 - int))
+  fi
+  return 0
+}
+
+color_for_remaining() { # <remaining> -> _r
+  if [ "$1" -ge 50 ]; then _r="$GREEN"
+  elif [ "$1" -ge 20 ]; then _r="$ORANGE"
+  else _r="$RED"
   fi
 }
 
-join_part() {
-  local current="$1"
-  local part="$2"
-
-  if [ -z "$part" ]; then
-    printf '%s' "$current"
-  elif [ -z "$current" ]; then
-    printf '%s' "$part"
-  else
-    printf '%s%s%s' "$current" "$SEP" "$part"
+join_part() { # <current> <part> -> _r
+  if [ -z "$2" ]; then _r="$1"
+  elif [ -z "$1" ]; then _r="$2"
+  else _r="$1$SEP$2"
   fi
 }
 
-visible_length() {
+visible_length() { # <text> -> _r (byte length without ANSI codes)
   local LC_ALL=C
   local plain="${1//$'\033'\[+([0-9;])m/}"
-  printf '%s' "${#plain}"
+  _r="${#plain}"
 }
 
-pad_visible_right() {
-  local text="$1"
-  local width="$2"
-  local length pad
-
-  length="$(visible_length "$text")"
-  pad=$((width - length))
-  printf '%s' "$text"
-  if [ "$pad" -gt 0 ]; then
-    printf '%*s' "$pad" ''
+pad_visible_right() { # <text> <width> -> _r
+  local text="$1" pad
+  visible_length "$text"
+  pad=$(($2 - _r))
+  if [ "$pad" -gt 0 ]; then printf -v _r '%s%*s' "$text" "$pad" ''
+  else _r="$text"
   fi
 }
 
-rate_icon_for_remaining() {
-  local remaining="$1"
-
-  if [ "$remaining" -eq 0 ]; then
-    printf '⌛️'
-  else
-    printf '⏳'
-  fi
+rate_icon_for_remaining() { # <remaining> -> _r
+  if [ "$1" -eq 0 ]; then _r='⌛️'; else _r='⏳'; fi
 }
 
-bar_for_percent() {
-  local pct="$1"
-  local color="${2:-}"
-  local reset_color=''
-  local filled empty bar
-
-  pct="$(clamp_round_percent "$pct")"
+bar_for_percent() { # <percent> [color] -> _r
+  local color="${2:-}" reset_color='' filled empty bar='' pct
+  clamp_round_percent "$1"; pct="$_r"
   filled=$((pct / 10))
-  if [ "$pct" -gt 0 ] && [ "$filled" -eq 0 ]; then
-    filled=1
-  fi
+  [ "$pct" -gt 0 ] && [ "$filled" -eq 0 ] && filled=1
   empty=$((10 - filled))
 
-  bar=""
-  if [ "$filled" -gt 0 ]; then
-    printf -v FILL "%${filled}s"
-    bar="${bar}${FILL// /▓}"
-  fi
-  if [ "$empty" -gt 0 ]; then
-    printf -v PAD "%${empty}s"
-    bar="${bar}${PAD// /░}"
-  fi
+  if [ "$filled" -gt 0 ]; then printf -v FILL "%${filled}s"; bar="${FILL// /▓}"; fi
+  if [ "$empty" -gt 0 ]; then printf -v PAD "%${empty}s"; bar="${bar}${PAD// /░}"; fi
 
   [ -n "$color" ] && reset_color="$RESET"
-  printf '%s%4s%% [%s]%s' "$color" "$pct" "$bar" "$reset_color"
+  printf -v _r '%s%4s%% [%s]%s' "$color" "$pct" "$bar" "$reset_color"
 }
 
-format_reset() {
+format_reset() { # <epoch> -> _r
   local epoch="${1:-}"
   if [ -z "$epoch" ] || [ "$epoch" = "null" ]; then
-    printf '%s' "$RATE_RESET_PLACEHOLDER"
-    return
+    _r="$RATE_RESET_PLACEHOLDER"
+    return 0
   fi
-
-  date -d "@$epoch" '+%m-%d %H:%M' 2>/dev/null \
-    || date -r "$epoch" '+%m-%d %H:%M' 2>/dev/null \
-    || printf '%s' "$epoch"
+  if [[ "$epoch" =~ ^[0-9]+$ ]] && printf -v _r '%(%m-%d %H:%M)T' "$epoch" 2>/dev/null; then
+    return 0
+  fi
+  _r="$(date -d "@$epoch" '+%m-%d %H:%M' 2>/dev/null)" \
+    || _r="$(date -r "$epoch" '+%m-%d %H:%M' 2>/dev/null)" \
+    || _r="$epoch"
 }
 
-format_k_tokens() {
-  local tokens="$1"
-
-  if [[ "$tokens" =~ ^[0-9]+$ ]] && [ "${#tokens}" -le 6 ]; then
-    printf '%dk' "$(((10#$tokens + 999) / 1000))"
-    return
+format_k_tokens() { # <tokens> -> _r
+  local t=0 tenths
+  [[ "${1:-}" =~ ^([0-9]+)(\.[0-9]+)?$ ]] && t=$((10#${BASH_REMATCH[1]}))
+  if [ "$t" -ge 1000000 ]; then
+    tenths=$(((t + 50000) / 100000))
+    _r="$((tenths / 10)).$((tenths % 10))m"
+  else
+    _r="$(((t + 999) / 1000))k"
   fi
-
-  awk -v tokens="$tokens" 'BEGIN {
-    if (tokens == "" || tokens !~ /^[0-9]+([.][0-9]+)?$/) tokens = 0
-    if (tokens >= 1000000) {
-      printf "%.1fm", tokens / 1000000
-    } else {
-      printf "%dk", int((tokens + 999) / 1000)
-    }
-  }'
 }
 
 context_tokens_segment() {
@@ -258,39 +215,45 @@ context_tokens_segment() {
     return
   fi
 
-  total="$(number_or_zero "$total")"
+  number_or_zero "$total"; total="$_r"
   if [ "$total" -le 0 ]; then
     return
   fi
 
-  input="$(number_or_zero "$ctx_input_tokens")"
-  cache_create="$(number_or_zero "$ctx_cache_creation_tokens")"
-  cache_read="$(number_or_zero "$ctx_cache_read_tokens")"
+  number_or_zero "$ctx_input_tokens"; input="$_r"
+  number_or_zero "$ctx_cache_creation_tokens"; cache_create="$_r"
+  number_or_zero "$ctx_cache_read_tokens"; cache_read="$_r"
 
   used=$((input + cache_create + cache_read))
   remaining=$((total - used))
   [ "$remaining" -lt 0 ] && remaining=0
 
-  printf ' %s / %s' "$(format_k_tokens "$remaining")" "$(format_k_tokens "$total")"
+  local rem_k
+  format_k_tokens "$remaining"; rem_k="$_r"
+  format_k_tokens "$total"
+  printf ' %s / %s' "$rem_k" "$_r"
 }
 
 tokens_segment() {
   local input output cache_create cache_read total current
 
-  input="$(number_or_zero "$ctx_total_input_tokens")"
-  output="$(number_or_zero "$ctx_total_output_tokens")"
+  number_or_zero "$ctx_total_input_tokens"; input="$_r"
+  number_or_zero "$ctx_total_output_tokens"; output="$_r"
   total=$((input + output))
 
-  input="$(number_or_zero "$ctx_input_tokens")"
-  output="$(number_or_zero "$ctx_output_tokens")"
-  cache_create="$(number_or_zero "$ctx_cache_creation_tokens")"
+  number_or_zero "$ctx_input_tokens"; input="$_r"
+  number_or_zero "$ctx_output_tokens"; output="$_r"
+  number_or_zero "$ctx_cache_creation_tokens"; cache_create="$_r"
   current=$((input + output + cache_create))
 
   if [ "$total" -eq 0 ] && [ "$current" -eq 0 ]; then
     return
   fi
 
-  printf '💎 tokens   Σ %s (+%s)' "$(format_k_tokens "$total")" "$(format_k_tokens "$current")"
+  local total_k
+  format_k_tokens "$total"; total_k="$_r"
+  format_k_tokens "$current"
+  printf '💎 tokens   Σ %s (+%s)' "$total_k" "$_r"
 }
 
 rate_segment() {
@@ -311,20 +274,21 @@ rate_segment() {
     if [ "$window" = "five_hour" ]; then
       rate_label="⏳ 5h       "
     else
-      rate_label="$(pad_visible_right "⏳ $label" "$label_width")"
+      pad_visible_right "⏳ $label" "$label_width"; rate_label="$_r"
     fi
     printf '%s%s%s%s (%s)' "$BOLD" "$rate_label" "$RESET" "$FIXED_EMPTY_BAR" "$RATE_RESET_PLACEHOLDER"
   else
-    remaining="$(remaining_from_used "$used")"
-    color="$(color_for_remaining "$remaining")"
-    icon="$(rate_icon_for_remaining "$remaining")"
-    reset_text="$(format_reset "$reset")"
+    remaining_from_used "$used"; remaining="$_r"
+    color_for_remaining "$remaining"; color="$_r"
+    rate_icon_for_remaining "$remaining"; icon="$_r"
+    format_reset "$reset"; reset_text="$_r"
     if [ "$window" = "five_hour" ]; then
       rate_label="$icon 5h      "
     else
-      rate_label="$(pad_visible_right "$icon $label" "$label_width")"
+      pad_visible_right "$icon $label" "$label_width"; rate_label="$_r"
     fi
-    printf '%s%s%s %s (%s)' "$BOLD" "$rate_label" "$RESET" "$(bar_for_percent "$remaining" "$color")" "$reset_text"
+    bar_for_percent "$remaining" "$color"
+    printf '%s%s%s %s (%s)' "$BOLD" "$rate_label" "$RESET" "$_r" "$reset_text"
   fi
 }
 
@@ -335,21 +299,25 @@ context_segment() {
 
   remaining="$ctx_remaining"
   if [ -z "$remaining" ]; then
-    segment="$(printf '%s%s%s  %s' "$BOLD" "$label" "$RESET" "$EMPTY_BAR")"
+    printf -v segment '%s%s%s  %s' "$BOLD" "$label" "$RESET" "$EMPTY_BAR"
     pad_visible_right "$segment" "$DETAIL_FIRST_SEGMENT_WIDTH"
+    printf '%s' "$_r"
     return
   fi
 
-  remaining="$(clamp_round_percent "$remaining")"
-  color="$(color_for_remaining "$remaining")"
+  clamp_round_percent "$remaining"; remaining="$_r"
+  color_for_remaining "$remaining"; color="$_r"
   tokens="$(context_tokens_segment)"
   
   if [ -n "$tokens" ]; then
-    segment="$(printf '%s%s%s  %s %s' "$BOLD" "$label" "$RESET" "$(bar_for_percent "$remaining" "$color")" "$tokens")"
+    bar_for_percent "$remaining" "$color"
+    printf -v segment '%s%s%s  %s %s' "$BOLD" "$label" "$RESET" "$_r" "$tokens"
   else
-    segment="$(printf '%s%s%s  %s' "$BOLD" "$label" "$RESET" "$(bar_for_percent "$remaining" "$color")")"
+    bar_for_percent "$remaining" "$color"
+    printf -v segment '%s%s%s  %s' "$BOLD" "$label" "$RESET" "$_r"
   fi
   pad_visible_right "$segment" "$DETAIL_FIRST_SEGMENT_WIDTH"
+  printf '%s' "$_r"
 }
 
 lines_segment() {
@@ -362,8 +330,8 @@ lines_segment() {
     return
   fi
 
-  added="$(number_or_zero "$added")"
-  removed="$(number_or_zero "$removed")"
+  number_or_zero "$added"; added="$_r"
+  number_or_zero "$removed"; removed="$_r"
   if [ "$added" -eq 0 ] && [ "$removed" -eq 0 ]; then
     return
   fi
@@ -371,12 +339,12 @@ lines_segment() {
   printf -v added_fmt -- '+ %d' "$added"
   printf -v removed_fmt -- '- %d' "$removed"
   if [ "$added" -gt 0 ]; then
-    added_text="$(printf '%s%s%s' "$GREEN" "$added_fmt" "$RESET")"
+    printf -v added_text '%s%s%s' "$GREEN" "$added_fmt" "$RESET"
   else
     added_text="$added_fmt"
   fi
   if [ "$removed" -gt 0 ]; then
-    removed_text="$(printf '%s%s%s' "$RED" "$removed_fmt" "$RESET")"
+    printf -v removed_text '%s%s%s' "$RED" "$removed_fmt" "$RESET"
   else
     removed_text="$removed_fmt"
   fi
@@ -399,20 +367,20 @@ cost_duration_segment() {
   duration="$total_duration_ms"
 
   output=""
-  cost="$(number_or_empty "$cost")"
+  number_or_empty "$cost"; cost="$_r"
   if [ -n "$cost" ]; then
     local cost_fmt
-    cost_fmt="$(printf '$%.2f' "$cost")"
-    output="$(printf '💰 %s%7s%s' "$YELLOW" "$cost_fmt" "$RESET")"
+    printf -v cost_fmt '$%.2f' "$cost"
+    printf -v output '💰 %s%7s%s' "$YELLOW" "$cost_fmt" "$RESET"
   fi
 
-  duration="$(integer_or_empty "$duration")"
+  integer_or_empty "$duration"; duration="$_r"
   if [ -n "$duration" ]; then
     local total_sec hours mins duration_text
     total_sec=$((duration / 1000))
     hours=$((total_sec / 3600))
     mins=$(((total_sec % 3600) / 60))
-    duration_text="$(printf '⏳ %02d:%02d' "$hours" "$mins")"
+    printf -v duration_text '⏳ %02d:%02d' "$hours" "$mins"
     if [ -n "$output" ]; then
       output="$output$SEP$duration_text"
     else
@@ -455,9 +423,9 @@ meta_segments() {
   agent="$agent_name"
 
   output=""
-  [ -n "$effort" ] && output="$(join_part "$output" "⚙️ effort    $effort")"
-  [ -n "$thinking" ] && output="$(join_part "$output" "💭 thinking    $thinking")"
-  [ -n "$agent" ] && output="$(join_part "$output" "🤖 agent $agent")"
+  [ -n "$effort" ] && { join_part "$output" "⚙️ effort    $effort"; output="$_r"; }
+  [ -n "$thinking" ] && { join_part "$output" "💭 thinking    $thinking"; output="$_r"; }
+  [ -n "$agent" ] && { join_part "$output" "🤖 agent $agent"; output="$_r"; }
 
   printf '%s' "$output"
 }
@@ -472,11 +440,11 @@ usage="$(usage_line)"
 meta="$(meta_segments)"
 
 first_line="${BOLD}${ORANGE}[$model_label]${RESET}   📁 $display_dir"
-first_line="$(join_part "$first_line" "$git_branch")"
+join_part "$first_line" "$git_branch"; first_line="$_r"
 detail_line=""
-detail_line="$(join_part "$detail_line" "$context")"
-detail_line="$(join_part "$detail_line" "$lines")"
-detail_line="$(join_part "$detail_line" "$tokens")"
+join_part "$detail_line" "$context"; detail_line="$_r"
+join_part "$detail_line" "$lines"; detail_line="$_r"
+join_part "$detail_line" "$tokens"; detail_line="$_r"
 printf '%s\n' "$first_line"
 if [ -n "$detail_line" ]; then
   printf '%s\n' "$detail_line"

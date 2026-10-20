@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -u
+shopt -s extglob
 
 input="$(cat)"
 
@@ -81,6 +82,10 @@ display_dir="${display_dir##*/}"
 [ -z "$display_dir" ] && display_dir="$current_dir"
 
 number_or_zero() {
+  if [[ "${1:-}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "$((10#$1))"
+    return
+  fi
   awk -v value="${1:-}" 'BEGIN {
     if (value == "" || value !~ /^-?[0-9]+([.][0-9]+)?$/) value = 0
     printf "%d", value
@@ -106,6 +111,11 @@ number_is_nonzero() {
 }
 
 clamp_round_percent() {
+  if [[ "$1" =~ ^[0-9]+$ ]]; then
+    local n=$((10#$1))
+    printf '%s' "$((n > 100 ? 100 : n))"
+    return
+  fi
   awk -v value="$1" 'BEGIN {
     if (value == "" || value !~ /^-?[0-9]+([.][0-9]+)?$/) value = 0
     if (value < 0) value = 0
@@ -115,6 +125,11 @@ clamp_round_percent() {
 }
 
 remaining_from_used() {
+  if [[ "$1" =~ ^[0-9]+$ ]]; then
+    local n=$((10#$1))
+    printf '%s' "$((n > 100 ? 0 : 100 - n))"
+    return
+  fi
   awk -v used="$1" 'BEGIN {
     if (used == "" || used !~ /^-?[0-9]+([.][0-9]+)?$/) used = 0
     remaining = 100 - used
@@ -150,7 +165,9 @@ join_part() {
 }
 
 visible_length() {
-  printf '%s' "$1" | perl -CS -Mutf8 -pe 's/\e\[[0-9;]*m//g' | awk '{ print length }'
+  local LC_ALL=C
+  local plain="${1//$'\033'\[+([0-9;])m/}"
+  printf '%s' "${#plain}"
 }
 
 pad_visible_right() {
@@ -210,15 +227,18 @@ format_reset() {
     return
   fi
 
-  if date -r "$epoch" '+%m-%d %H:%M' >/dev/null 2>&1; then
-    date -r "$epoch" '+%m-%d %H:%M'
-  else
-    date -d "@$epoch" '+%m-%d %H:%M' 2>/dev/null || printf '%s' "$epoch"
-  fi
+  date -d "@$epoch" '+%m-%d %H:%M' 2>/dev/null \
+    || date -r "$epoch" '+%m-%d %H:%M' 2>/dev/null \
+    || printf '%s' "$epoch"
 }
 
 format_k_tokens() {
   local tokens="$1"
+
+  if [[ "$tokens" =~ ^[0-9]+$ ]] && [ "${#tokens}" -le 6 ]; then
+    printf '%dk' "$(((10#$tokens + 999) / 1000))"
+    return
+  fi
 
   awk -v tokens="$tokens" 'BEGIN {
     if (tokens == "" || tokens !~ /^[0-9]+([.][0-9]+)?$/) tokens = 0
@@ -300,11 +320,7 @@ rate_segment() {
     icon="$(rate_icon_for_remaining "$remaining")"
     reset_text="$(format_reset "$reset")"
     if [ "$window" = "five_hour" ]; then
-      if [ "$remaining" -eq 0 ]; then
-        rate_label="$icon 5h      "
-      else
-        rate_label="$icon 5h      "
-      fi
+      rate_label="$icon 5h      "
     else
       rate_label="$(pad_visible_right "$icon $label" "$label_width")"
     fi
@@ -370,12 +386,9 @@ lines_segment() {
 git_branch_segment() {
   local branch
 
-  if ! git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
-    return
-  fi
-
-  branch="$(git -C "$current_dir" branch --show-current 2>/dev/null)"
-  [ -z "$branch" ] && branch="$(git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)"
+  branch="$(git -C "$current_dir" symbolic-ref --short -q HEAD 2>/dev/null)" \
+    || branch="$(git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)" \
+    || return 0
   printf '🌿 %s' "${branch:-unknown}"
 }
 

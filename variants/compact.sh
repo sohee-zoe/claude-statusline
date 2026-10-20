@@ -14,7 +14,7 @@
 #   STATUSLINE_CJK_AMBIGUOUS  1 => count box/block glyphs as 2 cells
 set -u
 
-input="$(cat)"
+IFS= read -r -d '' input
 
 if ! command -v jq >/dev/null 2>&1; then
   printf '[statusline] jq not found\n'
@@ -43,7 +43,7 @@ ctx_has=0; ctx_pct=0; ctx_tok_full=''; ctx_tok_short=''
 five_has=0; five_pct=0; five_reset=''
 seven_has=0; seven_pct=0; seven_reset=''
 
-parsed="$(printf '%s' "$input" | jq -r '
+parsed="$(jq -r '
   def n: if type == "number" then . else 0 end;
   def clampi: n | (if . < 0 then 0 elif . > 100 then 100 else . end) | round;
   def kfmt: n | if . >= 1000000 then (((. / 100000) | round) / 10 | tostring) + "M"
@@ -76,7 +76,7 @@ parsed="$(printf '%s' "$input" | jq -r '
       "seven_pct="   + ((100 - ($r.seven_day.used_percentage | n)) | clampi | tostring),
       "seven_reset=" + s($r.seven_day.resets_at)
     ] | .[]
-' 2>/dev/null)" || {
+' <<<"$input" 2>/dev/null)" || {
   printf '[statusline] invalid input\n'
   exit 0
 }
@@ -97,25 +97,26 @@ esac
 _color=''; _bar=''; _ell=''; _f=''; _e=''
 _seg_dir=''; _seg_branch=''; _seg_ctx=''; _seg_rate=''; _block=''
 
-branch_name=''
-if git -C "$current_dir" rev-parse --git-dir >/dev/null 2>&1; then
-  branch_name="$(git -C "$current_dir" branch --show-current 2>/dev/null)"
-  [ -z "$branch_name" ] && branch_name="$(git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)"
-  [ -z "$branch_name" ] && branch_name='unknown'
-fi
-
-# One date(1) call per window emits both the long and short reset strings.
-# Handles BSD (date -r) and GNU (date -d @) alike.
-resolve_reset() { # <epoch> -> "mm-dd HH:MM|HH:MM"
-  local epoch="${1:-}" out
-  case "$epoch" in ''|null|*[!0-9]*) printf '|'; return ;; esac
-  out="$(date -r "$epoch" '+%m-%d %H:%M|%H:%M' 2>/dev/null)" \
-    || out="$(date -d "@$epoch" '+%m-%d %H:%M|%H:%M' 2>/dev/null)" \
-    || out="$epoch|$epoch"
-  printf '%s' "$out"
+# Sets branch_name: branch, short SHA when detached, empty outside a repo.
+resolve_branch() {
+  branch_name="$(git -C "$current_dir" symbolic-ref --short -q HEAD 2>/dev/null)" && return
+  branch_name="$(git -C "$current_dir" rev-parse --short HEAD 2>/dev/null)"
 }
-five_r="$(resolve_reset "$five_reset")";   five_full="${five_r%%|*}";   five_short="${five_r#*|}"
-seven_r="$(resolve_reset "$seven_reset")"; seven_full="${seven_r%%|*}"; seven_short="${seven_r#*|}"
+resolve_branch
+
+# Sets _full/_short ("mm-dd HH:MM" / "HH:MM") from an epoch.
+resolve_reset() { # <epoch> -> _full _short
+  local epoch="${1:-}" out
+  _full=''; _short=''
+  case "$epoch" in ''|null|*[!0-9]*) return ;; esac
+  printf -v out '%(%m-%d %H:%M|%H:%M)T' "$epoch" 2>/dev/null \
+    || out="$(date -d "@$epoch" '+%m-%d %H:%M|%H:%M' 2>/dev/null)" \
+    || out="$(date -r "$epoch" '+%m-%d %H:%M|%H:%M' 2>/dev/null)" \
+    || out="$epoch|$epoch"
+  _full="${out%%|*}"; _short="${out#*|}"
+}
+resolve_reset "$five_reset";   five_full="$_full";   five_short="$_short"
+resolve_reset "$seven_reset";  seven_full="$_full";  seven_short="$_short"
 [ -z "$five_full" ]  && { five_full="$RESET_PLACEHOLDER_FULL";  five_short="$RESET_PLACEHOLDER_SHORT"; }
 [ -z "$seven_full" ] && { seven_full="$RESET_PLACEHOLDER_FULL"; seven_short="$RESET_PLACEHOLDER_SHORT"; }
 
@@ -204,19 +205,19 @@ set_rate() { # <5h|7d> <bar width> <full|short> -> _seg_rate
 }
 
 # ------------------------------------------------------------ terminal width
-detect_columns() {
-  local cols pad
+detect_columns() { # -> cols
+  local size pad
   cols="${STATUSLINE_COLUMNS:-${COLUMNS:-}}"
   case "$cols" in ''|*[!0-9]*) cols='' ;; esac
   if [ -z "$cols" ]; then
-    cols="$( { stty size </dev/tty | awk '{print $2}'; } 2>/dev/null )"
+    size="$( { stty size </dev/tty; } 2>/dev/null )"
+    cols="${size#* }"
     case "$cols" in ''|*[!0-9]*) cols='' ;; esac
   fi
   [ -z "$cols" ] && cols=120
   pad="${STATUSLINE_PADDING:-4}"
   case "$pad" in ''|*[!0-9]*) pad=4 ;; esac
   [ "$cols" -gt "$pad" ] && cols=$((cols - pad))
-  printf '%s' "$cols"
 }
 
 # Prints the first candidate block (records separated by \x1e) whose every
@@ -273,7 +274,8 @@ pick_layout() {
 }
 
 # --------------------------------------------------------------- composition
-cols="$(detect_columns)"
+cols=''
+detect_columns
 amb=0
 case "${STATUSLINE_CJK_AMBIGUOUS:-0}" in 1|true|yes) amb=1 ;; esac
 dir_style="${STATUSLINE_DIR_STYLE:-basename}"
